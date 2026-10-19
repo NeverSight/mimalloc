@@ -528,6 +528,19 @@ static inline size_t mi_min(size_t x,  size_t y) { return (x <= y ? x : y); }
 // maximum
 static inline size_t mi_max(size_t x,  size_t y) { return (x >= y ? x : y); }
 
+// NeverSight modification (2026-10-19): macOS malloc promises alignment for
+// every data type, even for tiny requests. Its libffi also relies on a 16-byte
+// minimum allocation when probing closures during CPython ctypes imports.
+// Normalize before selecting a page and setting debug padding, including the
+// first allocation on a thread. Other platforms keep their small size classes.
+static inline size_t _mi_malloc_minimal_size(size_t size) {
+  #if defined(__APPLE__) && defined(MI_MALLOC_OVERRIDE)
+  return (size < 16 ? 16 : size);
+  #else
+  return size;
+  #endif
+}
+
 // Is `x` a power of two? (0 is considered a power of two)
 static inline bool _mi_is_power_of_two(uintptr_t x) {
   return ((x & (x - 1)) == 0);

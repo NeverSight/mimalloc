@@ -153,6 +153,11 @@ extern void* _mi_page_malloc_zero(mi_theap_t* theap, mi_page_t* page, size_t siz
 static mi_decl_forceinline mi_decl_restrict void* mi_theap_nonnull_xmalloc_small_zero(mi_theap_t* theap, size_t xsize, bool is_wsize, bool zero, mi_page_t** ppage) mi_attr_noexcept
 {
   size_t size = (is_wsize ? xsize * MI_SIZE_SIZE : xsize);
+  const size_t min_size = _mi_malloc_minimal_size(size);
+  if (min_size != size) {
+    size = min_size;
+    xsize = (is_wsize ? size / MI_SIZE_SIZE : size);
+  }
   mi_assert(theap != NULL);
   mi_assert(size <= MI_SMALL_SIZE_MAX);
   #if MI_DEBUG
@@ -192,6 +197,7 @@ static mi_decl_forceinline void* mi_theap_malloc_generic(mi_theap_t* theap, size
   #endif
   mi_assert(mi_theap_matches_thread(theap));   // theaps are thread local
   mi_assert((huge_alignment & 1)==0);
+  size = _mi_malloc_minimal_size(size);
   void* const p = _mi_malloc_generic(theap, size + MI_PADDING_SIZE, (zero ? 1 : 0) | huge_alignment, ppage);  // note: size can overflow but it is detected in malloc_generic
   mi_track_malloc(p, size, zero);
 

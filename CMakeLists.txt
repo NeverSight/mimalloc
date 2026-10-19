@@ -1178,6 +1178,17 @@ if (MI_BUILD_TESTS)
     add_test(NAME test-stress-static COMMAND ${CMAKE_COMMAND} -E env MIMALLOC_VERBOSE=1 MIMALLOC_SHOW_STATS=1 $<TARGET_FILE:mimalloc-test-stress-static>)
   endif()
 
+  # NeverSight: the macOS zone and interposition paths must share the system
+  # minimum allocation contract, including fresh threads and libffi closures.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND MI_OVERRIDE AND MI_BUILD_OBJECT AND NOT MI_DEBUG_TSAN AND NOT MI_DEBUG_UBSAN)
+    add_executable(mimalloc-test-osx-override test/test-osx-override.c)
+    target_compile_definitions(mimalloc-test-osx-override PRIVATE ${mi_defines})
+    target_compile_options(mimalloc-test-osx-override PRIVATE ${mi_cflags})
+    target_include_directories(mimalloc-test-osx-override PRIVATE include)
+    target_link_libraries(mimalloc-test-osx-override PRIVATE mimalloc-obj ${mi_libraries})
+    add_test(NAME test-osx-override COMMAND mimalloc-test-osx-override)
+  endif()
+
   # dynamic override test
   if(MI_BUILD_SHARED AND MI_OVERRIDE AND NOT (MI_CYGWIN OR (MI_TRACK STREQUAL "ASAN") OR MI_DEBUG_TSAN OR MI_DEBUG_UBSAN)) # AND NOT (APPLE AND MI_USE_CXX))
     add_executable(mimalloc-test-stress-dynamic test/test-stress.c)

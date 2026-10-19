@@ -112,6 +112,7 @@ size_t _mi_bin_size(size_t bin) {
 
 // Good size for allocation
 mi_decl_nodiscard mi_decl_export size_t mi_good_size(size_t size) mi_attr_noexcept {
+  size = _mi_malloc_minimal_size(size);
   if (size <= MI_LARGE_MAX_OBJ_SIZE - MI_PADDING_SIZE) {
     return _mi_bin_size(mi_bin(size + MI_PADDING_SIZE));
   }
