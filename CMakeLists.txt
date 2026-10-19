@@ -1187,6 +1187,16 @@ if (MI_BUILD_TESTS)
     target_include_directories(mimalloc-test-osx-override PRIVATE include)
     target_link_libraries(mimalloc-test-osx-override PRIVATE mimalloc-obj ${mi_libraries})
     add_test(NAME test-osx-override COMMAND mimalloc-test-osx-override)
+    if(MI_OSX_ZONE)
+      add_library(mimalloc-test-osx-early-zone-lib SHARED test/test-osx-early-zone-lib.c)
+      target_link_options(mimalloc-test-osx-early-zone-lib PRIVATE "-Wl,-undefined,dynamic_lookup")
+      add_executable(mimalloc-test-osx-early-zone test/test-osx-early-zone.c)
+      target_include_directories(mimalloc-test-osx-early-zone PRIVATE include)
+      target_link_options(mimalloc-test-osx-early-zone PRIVATE "-Wl,-exported_symbol,_mi_test_early_malloc")
+      target_link_libraries(mimalloc-test-osx-early-zone PRIVATE mimalloc-obj
+        mimalloc-test-osx-early-zone-lib ${mi_libraries})
+      add_test(NAME test-osx-early-zone COMMAND mimalloc-test-osx-early-zone)
+    endif()
   endif()
 
   # dynamic override test

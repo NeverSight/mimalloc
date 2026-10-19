@@ -115,6 +115,10 @@ terms of the MIT license. A copy of the license can be found in the file
 // Internal functions
 // --------------------------------------------------------------------------
 
+#if defined(__APPLE__) && defined(MI_MALLOC_OVERRIDE) && MI_OSX_ZONE
+mi_decl_hidden void _mi_osx_zone_register(void);
+#endif
+
 
 // "libc.c"
 #include <stdarg.h>

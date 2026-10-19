@@ -277,6 +277,13 @@ static bool is_mimalloc_zone( malloc_zone_t* zone ) {
 
 #if defined(MI_OSX_INTERPOSE) && defined(MI_SHARED_LIB_EXPORT)
 
+void _mi_osx_zone_register(void) {
+  mi_atomic_do_once {
+    malloc_zone_register(&mi_malloc_zone);
+  }
+}
+
+
 // ------------------------------------------------------
 // Override malloc_xxx and malloc_zone_xxx api's to use only
 // our mimalloc zone. Since even the loader uses malloc
@@ -288,9 +295,7 @@ static bool is_mimalloc_zone( malloc_zone_t* zone ) {
 // ------------------------------------------------------
 
 static inline malloc_zone_t* mi_get_default_zone(void) {
-  mi_atomic_do_once {
-    malloc_zone_register(&mi_malloc_zone);  // by calling register we avoid a zone error on free (see <http://eatmyrandom.blogspot.com/2010/03/mallocfree-interception-on-mac-os-x.html>)
-  }
+  _mi_osx_zone_register();
   return &mi_malloc_zone;
 }
 
@@ -448,6 +453,41 @@ static inline malloc_zone_t* mi_get_default_zone(void)
   }
 }
 
+void _mi_osx_zone_register(void) {
+  mi_atomic_do_once {
+    malloc_zone_t* purgeable_zone = NULL;
+
+    #if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
+    // force the purgeable zone to exist to avoid strange bugs
+    if (malloc_default_purgeable_zone) {
+      purgeable_zone = malloc_default_purgeable_zone();
+    }
+    #endif
+
+    // Register our zone.
+    // thomcc: I think this is still needed to put us in the zone list.
+    malloc_zone_register(&mi_malloc_zone);
+    // Unregister the default zone, this makes our zone the new default
+    // as that was the last registered.
+    malloc_zone_t *default_zone = mi_get_default_zone();
+    // thomcc: Unsure if the next test is *always* false or just false in the
+    // cases I've tried. I'm also unsure if the code inside is needed. at all
+    if (default_zone != &mi_malloc_zone) {
+      malloc_zone_unregister(default_zone);
+
+      // Reregister the default zone so free and realloc in that zone keep working.
+      malloc_zone_register(default_zone);
+    }
+
+    // Unregister, and re-register the purgeable_zone to avoid bugs if it occurs
+    // earlier than the default zone.
+    if (purgeable_zone != NULL) {
+      malloc_zone_unregister(purgeable_zone);
+      malloc_zone_register(purgeable_zone);
+    }
+  }
+}
+
 #if defined(__clang__)
 __attribute__((constructor(101))) // highest priority
 #else
@@ -455,37 +495,7 @@ __attribute__((constructor))      // priority level is not supported by gcc
 #endif
 __attribute__((used))
 static void _mi_macos_override_malloc(void) {
-  malloc_zone_t* purgeable_zone = NULL;
-
-  #if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
-  // force the purgeable zone to exist to avoid strange bugs
-  if (malloc_default_purgeable_zone) {
-    purgeable_zone = malloc_default_purgeable_zone();
-  }
-  #endif
-
-  // Register our zone.
-  // thomcc: I think this is still needed to put us in the zone list.
-  malloc_zone_register(&mi_malloc_zone);
-  // Unregister the default zone, this makes our zone the new default
-  // as that was the last registered.
-  malloc_zone_t *default_zone = mi_get_default_zone();
-  // thomcc: Unsure if the next test is *always* false or just false in the
-  // cases I've tried. I'm also unsure if the code inside is needed. at all
-  if (default_zone != &mi_malloc_zone) {
-    malloc_zone_unregister(default_zone);
-
-    // Reregister the default zone so free and realloc in that zone keep working.
-    malloc_zone_register(default_zone);
-  }
-
-  // Unregister, and re-register the purgeable_zone to avoid bugs if it occurs
-  // earlier than the default zone.
-  if (purgeable_zone != NULL) {
-    malloc_zone_unregister(purgeable_zone);
-    malloc_zone_register(purgeable_zone);
-  }
-
+  _mi_osx_zone_register();
 }
 #endif  // MI_OSX_INTERPOSE
 
